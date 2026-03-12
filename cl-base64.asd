@@ -19,4 +19,6 @@
   :components ((:module "test"
                 :components ((:file "test-base64"))))
   :perform (test-op (o c)
-             (uiop:symbol-call :cl-base64.test :run-tests)))
+             (let ((result (uiop:symbol-call :cl-base64.test :run-tests)))
+               (unless result
+                 (error "Tests failed")))))
