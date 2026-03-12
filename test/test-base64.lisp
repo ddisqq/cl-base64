@@ -14,7 +14,7 @@
 (defvar *fail-count* 0)
 
 (defmacro deftest (name &body body)
-  `(progn
+  `(defun ,name ()
      (incf *test-count*)
      (handler-case
          (progn
