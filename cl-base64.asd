@@ -3,7 +3,7 @@
   :version "0.1.0"
   :author "Park Ian Co"
   :license "MIT"
-  :description "Base64"
+  :description "Base64 encoding/decoding (RFC 4648)"
   :depends-on ()
   :components ((:module "src"
                 :components ((:file "package")
@@ -11,11 +11,10 @@
                (:module "test"
                 :components ((:file "test"))))
   :in-order-to ((test-op (test-op "CL_BASE64/test")))
-  :defsystem-depends-on ("prove")
-  :perform (test-op (op c) (symbol-call :prove 'run c)))
+  :perform (test-op (op c) (symbol-call :CL_BASE64 'run-tests)))
 
 (defsystem "CL_BASE64/test"
   :name "CL_BASE64/test"
-  :depends-on ("CL_BASE64" "prove")
+  :depends-on ("CL_BASE64")
   :components ((:module "test"
                 :components ((:file "test")))))

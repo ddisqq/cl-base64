@@ -11,6 +11,9 @@
 (defpackage :CL_BASE64
   (:nicknames :base64)
   (:use :cl)
-  (:export))
+  (:export
+   #:encode-base64
+   #:decode-base64
+   #:validate-base64))
 
 (in-package :CL_BASE64)
