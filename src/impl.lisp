@@ -1,69 +1,101 @@
 ;; Copyright (c) 2024-2026 Parkian Company LLC. All rights reserved.
 ;; SPDX-License-Identifier: BSD-3-Clause
 
-;;;; Copyright (C) 2025 Park Ian Co
-;;;; License: MIT
-;;;;
-;;;; Implementation for CL_BASE64
+(in-package :cl-base64)
 
-(defvar *base64-chars* "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
-(defvar *base64-pad* #\=)
+(defparameter *base64-chars*
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+(defparameter *base64-pad* #\=)
+
+(defun normalize-octets (data)
+  "Coerce DATA to an octet vector."
+  (cond
+    ((stringp data)
+     (map '(vector (unsigned-byte 8)) #'char-code data))
+    ((vectorp data)
+     (let ((result (make-array (length data) :element-type '(unsigned-byte 8))))
+       (dotimes (index (length data) result)
+         (let ((value (aref data index)))
+           (unless (typep value '(unsigned-byte 8))
+             (error "Vector element ~D is not an octet: ~S" index value))
+           (setf (aref result index) value)))))
+    ((listp data)
+     (normalize-octets (coerce data 'vector)))
+    (t
+     (error "Unsupported base64 input: ~S" data))))
+
+(defun char-to-base64-index (char)
+  "Return the alphabet index for CHAR."
+  (let ((position (position char *base64-chars* :test #'char=)))
+    (if position
+        position
+        (error "Invalid base64 character: ~A" char))))
 
 (defun encode-base64 (data)
-  "Encode DATA (string or byte vector) to RFC 4648 base64."
-  (let ((bytes (if (stringp data)
-                   (map 'vector #'char-code data)
-                   data)))
+  "Encode DATA to RFC 4648 base64."
+  (let ((bytes (normalize-octets data)))
     (with-output-to-string (out)
-      (loop for i from 0 by 3 below (length bytes)
-            for b1 = (aref bytes i)
-            for b2 = (if (< (1+ i) (length bytes)) (aref bytes (1+ i)) 0)
-            for b3 = (if (< (+ i 2) (length bytes)) (aref bytes (+ i 2)) 0)
-            do
-            ;; Encode 3 bytes to 4 base64 chars
-            (write-char (aref *base64-chars* (ash b1 -2)) out)
-            (write-char (aref *base64-chars* (logior (logand (ash b1 4) 48)
-                                                       (ash b2 -4))) out)
-            (if (< (1+ i) (length bytes))
-                (write-char (aref *base64-chars* (logior (logand (ash b2 2) 60)
-                                                           (ash b3 -6))) out)
-                (write-char *base64-pad* out))
-            (if (< (+ i 2) (length bytes))
-                (write-char (aref *base64-chars* (logand b3 63)) out)
-                (write-char *base64-pad* out))))))
-
-(defun decode-base64 (encoded)
-  "Decode RFC 4648 base64 string to byte vector."
-  (let* ((s (string-trim '(#\Space #\Newline #\Return #\Tab) encoded))
-         (result (make-array (length s) :element-type '(unsigned-byte 8) :fill-pointer 0)))
-    (flet ((char-to-val (c)
-             (cond
-               ((char>= c #\A) (if (char>= c #\a)
-                                   (+ 26 (- (char-code c) (char-code #\a)))
-                                   (- (char-code c) (char-code #\A))))
-               ((char>= c #\0) (+ 52 (- (char-code c) (char-code #\0))))
-               ((char= c #\+) 62)
-               ((char= c #\/) 63)
-               ((char= c *base64-pad*) 0)
-               (t (error "Invalid base64 character: ~A" c)))))
-      (loop for i from 0 by 4 below (length s)
-            for c1 = (char-to-val (aref s i))
-            for c2 = (if (< (1+ i) (length s)) (char-to-val (aref s (1+ i))) 0)
-            for c3 = (if (< (+ i 2) (length s)) (char-to-val (aref s (+ i 2))) 0)
-            for c4 = (if (< (+ i 3) (length s)) (char-to-val (aref s (+ i 3))) 0)
-            do
-            (vector-push (logior (ash c1 2) (ash c2 -4)) result)
-            (unless (char= (if (< (+ i 2) (length s)) (aref s (+ i 2)) *base64-pad*) *base64-pad*)
-              (vector-push (logior (ash (logand c2 15) 4) (ash c3 -2)) result))
-            (unless (char= (if (< (+ i 3) (length s)) (aref s (+ i 3)) *base64-pad*) *base64-pad*)
-              (vector-push (logior (ash (logand c3 3) 6) c4) result))))
-    result))
+      (loop for index from 0 below (length bytes) by 3
+            for b1 = (aref bytes index)
+            for has-b2 = (< (1+ index) (length bytes))
+            for has-b3 = (< (+ index 2) (length bytes))
+            for b2 = (if has-b2 (aref bytes (1+ index)) 0)
+            for b3 = (if has-b3 (aref bytes (+ index 2)) 0)
+            do (write-char (aref *base64-chars* (ldb (byte 6 2) b1)) out)
+               (write-char (aref *base64-chars*
+                                 (logior (ash (logand b1 #b11) 4)
+                                         (ldb (byte 4 4) b2)))
+                           out)
+               (write-char (if has-b2
+                               (aref *base64-chars*
+                                     (logior (ash (logand b2 #b1111) 2)
+                                             (ldb (byte 2 6) b3)))
+                               *base64-pad*)
+                           out)
+               (write-char (if has-b3
+                               (aref *base64-chars* (logand b3 #b111111))
+                               *base64-pad*)
+                           out)))))
 
 (defun validate-base64 (encoded)
-  "Return T if ENCODED is valid RFC 4648 base64, NIL otherwise."
-  (let ((s (string-trim '(#\Space #\Newline #\Return #\Tab) encoded)))
-    (and (= (mod (length s) 4) 0)
-         (loop for c across s
-               always (or (position c *base64-chars*)
-                          (char= c *base64-pad*))))))
+  "Return true when ENCODED is structurally valid RFC 4648 base64."
+  (let ((trimmed (string-trim '(#\Space #\Newline #\Return #\Tab) encoded)))
+    (and (zerop (mod (length trimmed) 4))
+         (or (zerop (length trimmed))
+             (let ((padding-start (position *base64-pad* trimmed)))
+               (and
+                (loop for char across trimmed
+                      always (or (position char *base64-chars* :test #'char=)
+                                 (char= char *base64-pad*)))
+                (or (null padding-start)
+                    (and (<= (- (length trimmed) padding-start) 2)
+                         (loop for index from padding-start below (length trimmed)
+                               always (char= (char trimmed index) *base64-pad*))))))))))
 
+(defun decode-base64 (encoded)
+  "Decode RFC 4648 base64 ENCODED into an octet vector."
+  (let ((trimmed (string-trim '(#\Space #\Newline #\Return #\Tab) encoded)))
+    (unless (validate-base64 trimmed)
+      (error "Invalid base64 input: ~S" encoded))
+    (let ((result (make-array 0
+                              :element-type '(unsigned-byte 8)
+                              :adjustable t
+                              :fill-pointer 0)))
+      (loop for index from 0 below (length trimmed) by 4
+            for c1 = (char trimmed index)
+            for c2 = (char trimmed (1+ index))
+            for c3 = (char trimmed (+ index 2))
+            for c4 = (char trimmed (+ index 3))
+            for v1 = (char-to-base64-index c1)
+            for v2 = (char-to-base64-index c2)
+            for v3 = (if (char= c3 *base64-pad*) 0 (char-to-base64-index c3))
+            for v4 = (if (char= c4 *base64-pad*) 0 (char-to-base64-index c4))
+            do (vector-push-extend (logior (ash v1 2) (ash v2 -4)) result)
+               (unless (char= c3 *base64-pad*)
+                 (vector-push-extend (logior (ash (logand v2 #b1111) 4)
+                                             (ash v3 -2))
+                                     result))
+               (unless (char= c4 *base64-pad*)
+                 (vector-push-extend (logior (ash (logand v3 #b11) 6) v4)
+                                     result)))
+      result)))

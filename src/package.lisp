@@ -8,7 +8,7 @@
 
 (in-package :cl-user)
 
-(defpackage :CL_BASE64
+(defpackage :cl-base64
   (:nicknames :base64)
   (:use :cl)
   (:export
@@ -16,4 +16,4 @@
    #:decode-base64
    #:validate-base64))
 
-(in-package :CL_BASE64)
+(in-package :cl-base64)

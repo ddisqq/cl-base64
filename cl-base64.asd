@@ -1,20 +1,24 @@
-(defsystem "CL_BASE64"
-  :name "CL_BASE64"
+(asdf:defsystem #:cl-base64
+  :name "cl-base64"
   :version "0.1.0"
-  :author "Park Ian Co"
-  :license "MIT"
+  :author "Parkian Company LLC"
+  :license "BSD-3-Clause"
   :description "Base64 encoding/decoding (RFC 4648)"
-  :depends-on ()
+  :serial t
   :components ((:module "src"
+                :serial t
                 :components ((:file "package")
-                             (:file "impl" :depends-on ("package"))))
-               (:module "test"
-                :components ((:file "test"))))
-  :in-order-to ((test-op (test-op "CL_BASE64/test")))
-  :perform (test-op (op c) (symbol-call :CL_BASE64 'run-tests)))
+                             (:file "impl"))))
+  :in-order-to ((asdf:test-op (asdf:test-op #:cl-base64/test))))
 
-(defsystem "CL_BASE64/test"
-  :name "CL_BASE64/test"
-  :depends-on ("CL_BASE64")
+(asdf:defsystem #:cl-base64/test
+  :name "cl-base64/test"
+  :depends-on (#:cl-base64)
+  :serial t
   :components ((:module "test"
-                :components ((:file "test")))))
+                :serial t
+                :components ((:file "test"))))
+  :perform (asdf:test-op (op c)
+             (declare (ignore op c))
+             (unless (uiop:symbol-call :cl-base64.test :run-tests)
+               (error "Tests failed"))))

@@ -1,11 +1,12 @@
 # Base64
 
-Base64 encoding and decoding utilities.
+RFC 4648 base64 encoding and decoding utilities for Common Lisp.
 
 ## Features
 
-- Core functionality implementation
-- Pure Common Lisp (zero external dependencies)
+- Encode strings, octet vectors, or octet lists to base64
+- Decode base64 strings into octet vectors
+- Validate base64 structure before decoding
 
 ## Installation
 
@@ -16,8 +17,9 @@ Base64 encoding and decoding utilities.
 ## Usage
 
 ```lisp
-;; Example usage
-(main-function)
+(let* ((encoded (cl-base64:encode-base64 "hello"))
+       (decoded (cl-base64:decode-base64 encoded)))
+  (values encoded decoded))
 ```
 
 ## Testing
@@ -28,7 +30,9 @@ Base64 encoding and decoding utilities.
 
 ## API
 
-- `main-function - Primary function for core functionality`
+- `encode-base64` encodes strings or octet sequences to RFC 4648 base64.
+- `decode-base64` decodes a base64 string to an octet vector.
+- `validate-base64` checks padding and alphabet validity.
 
 ## License
 
