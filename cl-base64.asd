@@ -1,24 +1,21 @@
-;;;; Copyright (c) 2024-2026 Parkian Company LLC. All rights reserved.
-;;;; SPDX-License-Identifier: BSD-3-Clause
-
-(asdf:defsystem #:cl-base64
-  :description "RFC 4648 Base64 encoding/decoding for Common Lisp"
-  :author "Parkian Company LLC"
-  :license "BSD-3-Clause"
+(defsystem "CL_BASE64"
+  :name "CL_BASE64"
   :version "0.1.0"
-  :serial t
-  :components ((:file "package")
-               (:module "src"
-                :components ((:file "base64"))))
-  :in-order-to ((asdf:test-op (test-op #:cl-base64/test))))
+  :author "Park Ian Co"
+  :license "MIT"
+  :description "Base64"
+  :depends-on ()
+  :components ((:module "src"
+                :components ((:file "package")
+                             (:file "impl" :depends-on ("package"))))
+               (:module "test"
+                :components ((:file "test"))))
+  :in-order-to ((test-op (test-op "CL_BASE64/test")))
+  :defsystem-depends-on ("prove")
+  :perform (test-op (op c) (symbol-call :prove 'run c)))
 
-(asdf:defsystem #:cl-base64/test
-  :description "Tests for cl-base64"
-  :depends-on (#:cl-base64)
-  :serial t
+(defsystem "CL_BASE64/test"
+  :name "CL_BASE64/test"
+  :depends-on ("CL_BASE64" "prove")
   :components ((:module "test"
-                :components ((:file "test-base64"))))
-  :perform (asdf:test-op (o c)
-             (let ((result (uiop:symbol-call :cl-base64.test :run-tests)))
-               (unless result
-                 (error "Tests failed")))))
+                :components ((:file "test")))))
