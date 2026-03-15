@@ -146,4 +146,145 @@ Returns (values processed-results error-alist)."
 (defun identity-list (x) (if (listp x) x (list x)))
 (defun flatten (l) (cond ((null l) nil) ((atom l) (list l)) (t (append (flatten (car l)) (flatten (cdr l))))))
 (defun map-keys (fn hash) (let ((res nil)) (maphash (lambda (k v) (push (funcall fn k) res)) hash) res))
-(defun now-timestamp () (get-universal-time))
+;;; ============================================================================
+;;; URL-Safe Base64 (RFC 4648 Section 5)
+;;; ============================================================================
+
+(defparameter *base64-url-chars*
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+
+(defun encode-base64-url (data)
+  "Encode DATA to RFC 4648 base64url (URL-safe variant without padding)."
+  (let ((bytes (normalize-octets data)))
+    (with-output-to-string (out)
+      (loop for index from 0 below (length bytes) by 3
+            for b1 = (aref bytes index)
+            for has-b2 = (< (1+ index) (length bytes))
+            for has-b3 = (< (+ index 2) (length bytes))
+            for b2 = (if has-b2 (aref bytes (1+ index)) 0)
+            for b3 = (if has-b3 (aref bytes (+ index 2)) 0)
+            do (write-char (aref *base64-url-chars* (ldb (byte 6 2) b1)) out)
+               (write-char (aref *base64-url-chars*
+                                 (logior (ash (logand b1 #b11) 4)
+                                         (ldb (byte 4 4) b2)))
+                           out)
+               (if has-b2
+                   (write-char (aref *base64-url-chars*
+                                     (logior (ash (logand b2 #b1111) 2)
+                                             (ldb (byte 2 6) b3)))
+                               out))
+               (if has-b3
+                   (write-char (aref *base64-url-chars* (logand b3 #b111111))
+                               out))))))
+
+(defun decode-base64-url (encoded)
+  "Decode RFC 4648 base64url ENCODED into an octet vector (padding optional)."
+  (let* ((trimmed (string-trim '(#\Space #\Newline #\Return #\Tab) encoded))
+         ;; Add padding if needed
+         (padded (case (mod (length trimmed) 4)
+                   (0 trimmed)
+                   (2 (concatenate 'string trimmed "=="))
+                   (3 (concatenate 'string trimmed "="))
+                   (t (error "Invalid base64url length: ~S" encoded))))
+         ;; Replace URL-safe chars with standard base64
+         (standard (substitute #\+ #\- (substitute #\/ #\_ padded))))
+    (decode-base64 standard)))
+
+;;; ============================================================================
+;;; Streaming Encoders/Decoders
+;;; ============================================================================
+
+(defun make-base64-encoder (&key (url-safe nil))
+  "Create a streaming base64 encoder closure.
+Returns (values encode-fn finalize-fn).
+encode-fn takes a byte vector, finalize-fn returns final padding."
+  (let ((buffer (make-array 0 :element-type '(unsigned-byte 8) :adjustable t :fill-pointer 0))
+        (chars (if url-safe *base64-url-chars* *base64-chars*))
+        (pad-char (if url-safe nil *base64-pad*)))
+    (flet ((encode-chunk (bytes)
+             (with-output-to-string (out)
+               (loop for i from 0 below (length bytes) by 3
+                     for b1 = (aref bytes i)
+                     for has-b2 = (< (1+ i) (length bytes))
+                     for has-b3 = (< (+ i 2) (length bytes))
+                     for b2 = (if has-b2 (aref bytes (1+ i)) 0)
+                     for b3 = (if has-b3 (aref bytes (+ i 2)) 0)
+                     do (write-char (aref chars (ldb (byte 6 2) b1)) out)
+                        (write-char (aref chars (logior (ash (logand b1 #b11) 4)
+                                                       (ldb (byte 4 4) b2)))
+                                    out)
+                        (if has-b2
+                            (write-char (aref chars (logior (ash (logand b2 #b1111) 2)
+                                                           (ldb (byte 2 6) b3)))
+                                        out))
+                        (if has-b3
+                            (write-char (aref chars (logand b3 #b111111)) out)
+                            (when pad-char (write-char pad-char out)))))))
+           (add-bytes (new-bytes)
+             (loop for byte across (normalize-octets new-bytes)
+                   do (vector-push-extend byte buffer)))
+           (encode-fn (data)
+             (add-bytes data)
+             ;; Only process complete 3-byte chunks
+             (let ((full-chunks (* 3 (floor (length buffer) 3))))
+               (if (> full-chunks 0)
+                   (let ((result (encode-chunk (subseq buffer 0 full-chunks))))
+                     ;; Keep remainder
+                     (let ((new-buffer (make-array (- (length buffer) full-chunks)
+                                                  :element-type '(unsigned-byte 8))))
+                       (replace new-buffer buffer :start2 full-chunks)
+                       (setf (fill-pointer buffer) 0)
+                       (loop for byte across new-buffer
+                             do (vector-push-extend byte buffer)))
+                     result)
+                   "")))
+           (finalize-fn ()
+             (if (> (length buffer) 0)
+                 (encode-chunk buffer)
+                 "")))
+      (values #'encode-fn #'finalize-fn))))
+
+(defun base64-encode-stream (input-stream output-stream &key (url-safe nil) (chunk-size 3072))
+  "Encode INPUT-STREAM to base64 in OUTPUT-STREAM.
+CHUNK-SIZE controls streaming buffer size (default 3KB)."
+  (multiple-value-bind (encode-fn finalize-fn)
+      (make-base64-encoder :url-safe url-safe)
+    (let ((buffer (make-array chunk-size :element-type '(unsigned-byte 8))))
+      (loop for bytes-read = (read-sequence buffer input-stream)
+            while (> bytes-read 0)
+            do (write-string (funcall encode-fn (subseq buffer 0 bytes-read)) output-stream))
+      (write-string (funcall finalize-fn) output-stream))))
+
+;;; ============================================================================
+;;; Utility Functions
+;;; ============================================================================
+
+(defun base64-encode-string (string)
+  "Encode STRING as UTF-8 then base64. Returns base64 string."
+  (encode-base64 (map '(vector (unsigned-byte 8)) #'char-code string)))
+
+(defun base64-decode-string (encoded)
+  "Decode base64 ENCODED and return as string (assumes UTF-8)."
+  (let ((bytes (decode-base64 encoded)))
+    (map 'string #'code-char bytes)))
+
+(defun usb8-array-to-base64-string (array)
+  "cl-base64 library compatibility: encode byte vector to base64 string."
+  (encode-base64 array))
+
+(defun base64-string-to-usb8-array (string)
+  "cl-base64 library compatibility: decode base64 string to byte vector."
+  (decode-base64 string))
+
+(defun string-to-base64-string (string)
+  "Encode STRING to base64."
+  (base64-encode-string string))
+
+(defun encode-base64-bytes (bytes)
+  "Encode BYTES to base64."
+  (encode-base64 bytes))
+
+;;; Constants for export
+(defparameter +base64-alphabet+ *base64-chars*)
+(defparameter +base64-url-alphabet+ *base64-url-chars*)
+(defparameter +base64-pad-char+ *base64-pad*)
