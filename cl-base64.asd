@@ -2,7 +2,7 @@
   :name "cl-base64"
   :version "0.1.0"
   :author "Parkian Company LLC"
-  :license "BSD-3-Clause"
+  :license "Apache-2.0"
   :description "Base64 encoding/decoding (RFC 4648)"
   :serial t
   :components ((:module "src"
