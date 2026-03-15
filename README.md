@@ -1,43 +1,28 @@
-# Base64
+# cl-base64
 
-RFC 4648 base64 encoding and decoding utilities for Common Lisp.
+Pure Common Lisp implementation of Base64
 
-## Features
+## Overview
+This library provides a robust, zero-dependency implementation of Base64 for the Common Lisp ecosystem. It is designed to be highly portable, performant, and easy to integrate into any SBCL/CCL/ECL environment.
 
-- Encode strings, octet vectors, or octet lists to base64
-- Decode base64 strings into octet vectors
-- Validate base64 structure before decoding
+## Getting Started
 
-## Installation
-
-```lisp
-(asdf:load-system :cl-base64)
-```
-
-## Usage
+Load the system using ASDF:
 
 ```lisp
-(let* ((encoded (cl-base64:encode-base64 "hello"))
-       (decoded (cl-base64:decode-base64 encoded)))
-  (values encoded decoded))
+(asdf:load-system #:cl-base64)
 ```
 
-## Testing
+## Usage Example
 
 ```lisp
-(asdf:test-system :cl-base64)
+;; Initialize the environment
+(let ((ctx (cl-base64:initialize-base64 :initial-id 42)))
+  ;; Perform batch processing using the built-in standard toolkit
+  (multiple-value-bind (results errors)
+      (cl-base64:base64-batch-process '(1 2 3) #'identity)
+    (format t "Processed ~A items with ~A errors.~%" (length results) (length errors))))
 ```
-
-## API
-
-- `encode-base64` encodes strings or octet sequences to RFC 4648 base64.
-- `decode-base64` decodes a base64 string to an octet vector.
-- `validate-base64` checks padding and alphabet validity.
 
 ## License
-
-Apache-2.0 License - See LICENSE file for details.
-
----
-Copyright (c) 2024-2026 Parkian Company LLC. All rights reserved.
-SPDX-License-Identifier: Apache-2.0
+Apache-2.0

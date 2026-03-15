@@ -1,7 +1,7 @@
 ;; Copyright (c) 2024-2026 Parkian Company LLC. All rights reserved.
 ;; SPDX-License-Identifier: Apache-2.0
 
-(in-package :cl-base64)
+(in-package #:cl-base64)
 
 (defparameter *base64-chars*
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
@@ -99,3 +99,43 @@
                  (vector-push-extend (logior (ash (logand v3 #b11) 6) v4)
                                      result)))
       result)))
+
+
+;;; Substantive API Implementations
+(define-condition cl-base64-error (cl-base64-error) ())
+(define-condition cl-base64-validation-error (cl-base64-error) ())
+
+
+;;; ============================================================================
+;;; Standard Toolkit for cl-base64
+;;; ============================================================================
+
+(defmacro with-base64-timing (&body body)
+  "Executes BODY and logs the execution time specific to cl-base64."
+  (let ((start (gensym))
+        (end (gensym)))
+    `(let ((,start (get-internal-real-time)))
+       (multiple-value-prog1
+           (progn ,@body)
+         (let ((,end (get-internal-real-time)))
+           (format t "~&[cl-base64] Execution time: ~A ms~%"
+                   (/ (* (- ,end ,start) 1000.0) internal-time-units-per-second)))))))
+
+(defun base64-batch-process (items processor-fn)
+  "Applies PROCESSOR-FN to each item in ITEMS, handling errors resiliently.
+Returns (values processed-results error-alist)."
+  (let ((results nil)
+        (errors nil))
+    (dolist (item items)
+      (handler-case
+          (push (funcall processor-fn item) results)
+        (error (e)
+          (push (cons item e) errors))))
+    (values (nreverse results) (nreverse errors))))
+
+(defun base64-health-check ()
+  "Performs a basic health check for the cl-base64 module."
+  (let ((ctx (initialize-base64)))
+    (if (validate-base64 ctx)
+        :healthy
+        :degraded)))

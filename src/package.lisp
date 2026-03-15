@@ -1,19 +1,16 @@
 ;; Copyright (c) 2024-2026 Parkian Company LLC. All rights reserved.
 ;; SPDX-License-Identifier: Apache-2.0
 
-;;;; Copyright (C) 2025 Park Ian Co
-;;;; License: MIT
-;;;;
-;;;; Package definition for CL_BASE64
+(in-package #:cl-user)
 
-(in-package :cl-user)
-
-(defpackage :cl-base64
-  (:nicknames :base64)
-  (:use :cl)
+(defpackage #:cl-base64
+  (:use #:cl)
   (:export
+   #:with-base64-timing
+   #:base64-batch-process
+   #:base64-health-check#:cl-base64-error
+   #:cl-base64-validation-error#:normalize-octets
    #:encode-base64
    #:decode-base64
-   #:validate-base64))
-
-(in-package :cl-base64)
+   #:validate-base64
+   #:char-to-base64-index))
