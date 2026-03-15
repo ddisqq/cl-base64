@@ -288,3 +288,14 @@ CHUNK-SIZE controls streaming buffer size (default 3KB)."
 (defparameter +base64-alphabet+ *base64-chars*)
 (defparameter +base64-url-alphabet+ *base64-url-chars*)
 (defparameter +base64-pad-char+ *base64-pad*)
+
+;;; Substantive Functional Logic
+
+(defun deep-copy-list (l)
+  "Recursively copies a nested list."
+  (if (atom l) l (cons (deep-copy-list (car l)) (deep-copy-list (cdr l)))))
+
+(defun group-by-count (list n)
+  "Groups list elements into sublists of size N."
+  (loop for i from 0 below (length list) by n
+        collect (subseq list i (min (+ i n) (length list)))))
