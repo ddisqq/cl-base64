@@ -6,7 +6,11 @@
 (defpackage #:cl-base64
   (:use #:cl)
   (:export
-   #:with-base64-timing
+   #:identity-list
+   #:flatten
+   #:map-keys
+   #:now-timestamp
+#:with-base64-timing
    #:base64-batch-process
    #:base64-health-check#:cl-base64-error
    #:cl-base64-validation-error#:normalize-octets
