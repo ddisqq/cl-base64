@@ -6,18 +6,8 @@
 (defpackage #:cl-base64
   (:use #:cl)
   (:export
-   #:memoize-function
-   #:deep-copy-list
-   #:group-by-count
-   #:identity-list
-   #:flatten
-   #:map-keys
-   #:now-timestamp
-#:with-base64-timing
-   #:base64-batch-process
-   #:base64-health-check#:cl-base64-error
-   #:cl-base64-validation-error#:normalize-octets
+   #:base64-execute
+   #:base64-context
+   #:initialize-base64
    #:encode-base64
-   #:decode-base64
-   #:validate-base64
-   #:char-to-base64-index))
+   #:decode-base64))
